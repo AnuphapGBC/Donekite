@@ -45,7 +45,7 @@ The test suite covers pricing and tax, workflow transitions, duplicate detection
 
 The PostgreSQL tests use an isolated PostgreSQL engine through PGlite and do not need the live Neon database or customer credentials. GitHub Actions runs installation, tests, lint, typechecking, and the build without database secrets. Migration and connectivity are separate operational checks: `npm run db:migrate` and `npm run db:check`.
 
-The earlier SQLite version passed all 36 tests, lint, TypeScript checking, the build, and an HTTP smoke check on November 8, 2026. That result does not certify the PostgreSQL migration; check the terminal output from the final checkout. Browser automation was unavailable, so visual layout, keyboard interaction, and print output still need a manual browser check.
+On November 8, 2026, the PostgreSQL version passed all 40 tests, lint, TypeScript checking, and the production build. The schema migration was applied to the supplied Neon database and a second run confirmed it was up to date. A live Neon transaction verified accounts, shared records, invitations, revision conflicts, and login/logout; all QA writes were rolled back. Browser automation was unavailable, so visual layout, keyboard interaction, and print output still need a manual browser check.
 
 During the simplification review, deliberately reversing the workspace identity guard caused the API regression test to fail; the original guard was restored immediately. This confirms that the test detects that cross-workspace write failure.
 
@@ -72,4 +72,4 @@ Before serving customer records, establish a Neon database backup and recovery p
 
 ## Source control
 
-The project is being prepared as a local Git repository. Secrets, database files, generated builds, dependencies, and local backups are excluded; `.env.example` contains placeholders only. The GitHub Actions workflow is ready for a future remote. Creating a remote, pushing source, and publishing the app are separate steps.
+The project has a local Git repository on `main`. Secrets, database files, generated builds, dependencies, and local backups are excluded; `.env.example` contains placeholders only. The GitHub Actions workflow is ready for a future remote. Creating a remote, pushing source, and publishing the app are separate steps.
