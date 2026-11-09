@@ -5,6 +5,8 @@ import './workspace.css';
 import './account.css';
 import './industry.css';
 import './record-details.css';
+import './enquiry-editor.css';
+import './enquiry-list.css';
 import './theme.css';
 export const metadata: Metadata = {
   title: 'DoneKite — less admin, more business',

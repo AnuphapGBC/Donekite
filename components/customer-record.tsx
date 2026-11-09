@@ -1,9 +1,12 @@
 'use client';
 
 import {useState} from 'react';
-import {ArrowRight,CheckCircle2,Clock,FileText,Mail,Printer,Receipt} from 'lucide-react';
+import {ArrowRight,CheckCircle2,Clock,FileText,Mail,Pencil,Printer,Receipt} from 'lucide-react';
 import {AppDialog} from '@/components/app-dialog';
-import {money,subtotal,total,type Activity,type Lead} from '@/lib/automation';
+import {EnquiryEditor} from '@/components/enquiry-editor';
+import {FollowupStatus} from '@/components/followup-status';
+import {money,subtotal,total,type Activity,type Lead,type LeadEditInput} from '@/lib/automation';
+import type {Followup} from '@/lib/enquiry-list';
 import {formatQuantity,getIndustry,getLeadUnit} from '@/lib/industries';
 
 type Action='quote'|'accept'|'invoice'|'paid'|'close';
@@ -13,6 +16,9 @@ type CustomerRecordProps={
   activity:Activity[];
   saving:boolean;
   error?:string;
+  followup?:Followup;
+  onCheckFollowup?:()=>Promise<void>;
+  onEdit?:(input:LeadEditInput,expected:LeadEditInput)=>Promise<boolean>;
   onClose:()=>void;
   onAction:(action:Action)=>Promise<boolean>;
 };
@@ -53,12 +59,14 @@ function RecordDocument({lead,businessName,invoice}:{lead:Lead;businessName:stri
   </article>;
 }
 
-function RecordDetails({lead,businessName,activity,saving,error,onAction}:Omit<CustomerRecordProps,'lead'|'onClose'>&{lead:Lead}) {
+function RecordDetails({lead,businessName,activity,saving,error,onAction,onEdit,followup,onCheckFollowup}:Omit<CustomerRecordProps,'lead'|'onClose'>&{lead:Lead}) {
   const [tab,setTab]=useState<'details'|'quote'|'invoice'|'history'>('details');
+  const [editing,setEditing]=useState(false);
   const [confirmClose,setConfirmClose]=useState(false);
   const [working,setWorking]=useState(false);
   const [actionError,setActionError]=useState('');
   const busy=saving||working;
+  const followupInfo:Followup=followup??{status:lead.status==='Quoted'&&lead.followupAt!==undefined?'ready':'none'};
   const history=activity.filter(item=>item.leadId===lead.id).toSorted((a,b)=>b.at-a.at);
   const nextAction:Exclude<Action,'close'>|null=lead.status==='Draft'?'quote':lead.status==='Quoted'?'accept':lead.status==='Accepted'?'invoice':lead.status==='Invoiced'?'paid':null;
   const actionLabels={quote:'Mark quote sent',accept:'Record acceptance',invoice:'Prepare invoice',paid:'Record payment'};
@@ -82,15 +90,28 @@ function RecordDetails({lead,businessName,activity,saving,error,onAction}:Omit<C
     Paid:'Payment is recorded. The quote, invoice, and activity remain available here.',
     Closed:'This enquiry is closed. Its documents and activity remain available for your records.',
   };
+  if(editing&&onEdit) return <EnquiryEditor key={lead.id} lead={lead} saving={saving} error={error} onCancel={()=>setEditing(false)} onSave={async(input,expected)=>{
+    const ok=await onEdit(input,expected);
+    if(ok) setEditing(false);
+    return ok;
+  }}/>;
   return <>
     <div className="record-summary"><span>{lead.service} · {lead.email}</span><span className={`badge badge-${lead.status.toLowerCase()}`}>{lead.status}</span></div>
     <div className="record-tabs" role="group" aria-label="Customer record sections">{(['details','quote','invoice','history'] as const).map(item=><button type="button" key={item} aria-pressed={tab===item} className={tab===item?'active':''} onClick={()=>{setTab(item);setConfirmClose(false);}}>{item==='history'?'History':item[0].toUpperCase()+item.slice(1)}</button>)}</div>
     <div className="record-content">
       {tab==='details'&&<>
+        <div className="record-edit-row"><h3>Customer & job details</h3>{onEdit&&<button className="btn secondary" type="button" disabled={busy} onClick={()=>setEditing(true)}><Pencil size={15} aria-hidden="true"/>Edit details</button>}</div>
         <dl className="record-details-grid"><div><dt>Service</dt><dd>{lead.service}</dd></div><div><dt>Scope</dt><dd>{formatQuantity(lead)}</dd></div><div><dt>Source</dt><dd>{lead.source}</dd></div><div><dt>Received</dt><dd>{date(lead.createdAt)}</dd></div></dl>
         <IndustryDetails lead={lead}/>
         <section className="record-notes"><h3>Customer notes</h3><p>{lead.notes||'No additional notes.'}</p></section>
-        {lead.status==='Quoted'&&lead.followupAt!==undefined&&<section className="record-followup"><h3><Mail size={17} aria-hidden="true"/>Follow-up ready</h3><p>A reminder was prepared {date(lead.followupAt)}. Review it in your email app before sending.</p><a className="btn secondary" href={emailDraft(lead,businessName,'followup')}><Mail size={16} aria-hidden="true"/>Open follow-up email</a></section>}
+        {followupInfo.status!=='none'&&<section className="record-followup">
+          <h3><Mail size={17} aria-hidden="true"/>Follow-up tracking</h3>
+          <FollowupStatus followup={followupInfo}/>
+          {followupInfo.status==='ready'&&<><p>A reminder was prepared {date(lead.followupAt!)}. Review it in your email app before sending.</p><a className="btn secondary" href={emailDraft(lead,businessName,'followup')}><Mail size={16} aria-hidden="true"/>Open follow-up email</a></>}
+          {followupInfo.status==='scheduled'&&<p>A draft will be prepared when the workspace loads or refreshes after this time.</p>}
+          {followupInfo.status==='due'&&<><p>This follow-up is due. Refresh the workspace to prepare its draft.</p>{onCheckFollowup&&<button className="btn secondary" type="button" disabled={busy} onClick={()=>void onCheckFollowup()}>Check follow-up</button>}</>}
+          {followupInfo.status==='paused'&&<p>Resume “Prepare a follow-up” in Rules & pricing to prepare reminders for unanswered quotes.</p>}
+        </section>}
       </>}
       {(tab==='quote'||(tab==='invoice'&&lead.invoiceAt!==undefined))&&<>
         <RecordDocument lead={lead} businessName={businessName} invoice={tab==='invoice'}/>
@@ -109,7 +130,7 @@ function RecordDetails({lead,businessName,activity,saving,error,onAction}:Omit<C
 }
 
 export function CustomerRecord(props:CustomerRecordProps) {
-  return <AppDialog open={!!props.lead} onClose={props.onClose} title={props.lead?.name??'Customer enquiry'}>{props.lead&&<RecordDetails key={props.lead.id} lead={props.lead} businessName={props.businessName} activity={props.activity} saving={props.saving} error={props.error} onAction={props.onAction}/>}</AppDialog>;
+  return <AppDialog open={!!props.lead} onClose={props.onClose} title={props.lead?.name??'Customer enquiry'}>{props.lead&&<RecordDetails key={props.lead.id} lead={props.lead} businessName={props.businessName} activity={props.activity} saving={props.saving} error={props.error} onAction={props.onAction} onEdit={props.onEdit} followup={props.followup} onCheckFollowup={props.onCheckFollowup}/>}</AppDialog>;
 }
 
 export default CustomerRecord;

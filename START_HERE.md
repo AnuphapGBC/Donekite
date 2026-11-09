@@ -29,9 +29,13 @@ Your business starts with an empty workspace. Accounts and customer records are 
 4. After the customer agrees, select **Record acceptance**. The invoice rule can prepare the invoice automatically.
 5. Review and share the invoice. Select **Record payment** only after receiving payment elsewhere.
 
+Open a record and choose **Edit details** to correct customer information, notes, or industry answers. Saved pricing and workflow status are preserved. In **Enquiries**, search job details, combine status and follow-up filters, and choose a sort order. CSV export includes the visible filtered list.
+
 Use **Rules & pricing** to select an industry and customize services, rates, quantity labels, limits, and increments. Review starter prices before using them. You can also change tax, follow-up delay, or draft preparation rules. Save your settings to share them with the team through Neon. Existing enquiries retain their original details and saved prices. Follow-ups are checked when the workspace loads or refreshes.
 
 The theme button switches between light and dark appearance and remembers your choice in this browser. Before choosing a theme, the app follows your device preference.
+
+The overview's **Review follow-ups** shortcut opens drafts that are ready or due. Each enquiry shows whether its follow-up is scheduled, due, ready, or paused.
 
 ## Work with a teammate
 

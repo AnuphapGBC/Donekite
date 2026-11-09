@@ -28,11 +28,18 @@ function event(state:State,title:string,detail:string,kind:EventKind,leadId?:str
 }
 function clone(state:State):State { return structuredClone(state); }
 export type LeadInput = Pick<Lead,'name'|'email'|'service'|'units'|'notes'|'source'|'serviceId'|'details'>;
-export function addLead(state:State,input:LeadInput):{state:State;id?:string;error?:string} {
-  if(!input || typeof input.name!=='string' || typeof input.email!=='string') return {state,error:'Please enter a name and valid email address.'};
+export type LeadEditInput = Pick<Lead,'name'|'email'|'notes'|'source'|'details'>;
+function validateContact(input:LeadEditInput):Omit<LeadEditInput,'details'>|string {
+  if(!input || typeof input.name!=='string' || typeof input.email!=='string') return 'Please enter a name and valid email address.';
   const name=input.name.trim(); const email=input.email.trim().toLowerCase();
-  if(!name || name.length>100 || email.length>150 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return {state,error:'Please enter a name and valid email address.'};
-  if(typeof input.notes!=='string' || input.notes.length>2000 || typeof input.source!=='string' || !input.source.trim() || input.source.length>100) return {state,error:'Choose an enquiry source and keep notes within 2,000 characters.'};
+  if(!name || name.length>100 || email.length>150 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'Please enter a name and valid email address.';
+  if(typeof input.notes!=='string' || input.notes.length>2000 || typeof input.source!=='string' || !input.source.trim() || input.source.length>100) return 'Choose an enquiry source and keep notes within 2,000 characters.';
+  return {name,email,notes:input.notes,source:input.source.trim()};
+}
+export function addLead(state:State,input:LeadInput):{state:State;id?:string;error?:string} {
+  const contact=validateContact(input);
+  if(typeof contact==='string') return {state,error:contact};
+  const {name,email}=contact;
   if(!validSettings(state.settings)) return {state,error:'Check your service rates, tax, and follow-up settings before adding an enquiry.'};
   const catalog=getCatalog(state.settings);
   const service=input.serviceId===undefined?catalog.find(item=>item.name===input.service):catalog.find(item=>item.id===input.serviceId);
@@ -42,11 +49,38 @@ export function addLead(state:State,input:LeadInput):{state:State;id?:string;err
   if(typeof details==='string') return {state,error:details};
   if(state.leads.some(l=>l.email.trim().toLowerCase()===email&&(l.serviceId?l.serviceId===service.id:l.service===service.name)&&!['Paid','Closed'].includes(l.status))) return {state,error:'This email already has an open enquiry for that service. Open the existing record to continue.'};
   const next=clone(state); const rate=getServiceRate(next.settings,service); const amount=Math.round(rate*input.units*100)/100;
-  const lead:Lead={name,email,service:service.name,serviceId:service.id,industry:industry.id,units:input.units,unit:service.unit,unitPlural:service.unitPlural,maxUnits:service.maxUnits,quantityStep:service.step,details,notes:input.notes,source:input.source.trim(),id:id(),status:'Draft',createdAt:next.now,rate,amount,tax:Math.round(amount*next.settings.taxPercent)/100,autoDrafted:next.rules.draftQuote};
+  const lead:Lead={...contact,service:service.name,serviceId:service.id,industry:industry.id,units:input.units,unit:service.unit,unitPlural:service.unitPlural,maxUnits:service.maxUnits,quantityStep:service.step,details,id:id(),status:'Draft',createdAt:next.now,rate,amount,tax:Math.round(amount*next.settings.taxPercent)/100,autoDrafted:next.rules.draftQuote};
   next.leads.unshift(lead);
   event(next,'Enquiry captured',`${name} · ${service.name} · ${lead.source}`,'capture',lead.id);
   if(next.rules.draftQuote) event(next,'Quote prepared automatically',`${name} · ${money(total(lead))} including tax · ready for your review`,'quote',lead.id);
   return {state:next,id:lead.id};
+}
+function sameEditable(left:LeadEditInput,right:LeadEditInput):boolean {
+  if(!left||!right||left.name!==right.name||left.email!==right.email||left.source!==right.source||left.notes!==right.notes) return false;
+  const leftDetails=left.details??{}; const rightDetails=right.details??{};
+  return Object.keys(leftDetails).length===Object.keys(rightDetails).length
+    &&Object.entries(leftDetails).every(([key,value])=>Object.hasOwn(rightDetails,key)&&rightDetails[key]===value);
+}
+export function updateLead(state:State,leadId:string,input:LeadEditInput,expected?:LeadEditInput):{state:State;error?:string} {
+  const original=state.leads.find(lead=>lead.id===leadId);
+  if(!original) return {state,error:'This enquiry could not be found. Refresh your workspace and try again.'};
+  if(expected!==undefined&&!sameEditable(original,expected)) return {state,error:'This enquiry was updated by a teammate. Load the latest details before saving.'};
+  const contact=validateContact(input);
+  if(typeof contact==='string') return {state,error:contact};
+  // The saved enquiry can belong to a different industry than today's template.
+  const details=validateDetails(input.details,original.industry??'cleaning');
+  if(typeof details==='string') return {state,error:details};
+  const open=(lead:Lead)=>!['Paid','Closed'].includes(lead.status);
+  if(open(original)&&state.leads.some(lead=>lead.id!==original.id&&open(lead)&&lead.email.trim().toLowerCase()===contact.email
+    &&(lead.serviceId&&original.serviceId?lead.serviceId===original.serviceId:lead.service===original.service))) {
+    return {state,error:'This email already has an open enquiry for that service. Open the existing record to continue.'};
+  }
+  if(sameEditable(original,{...contact,details})) return {state};
+  const next=clone(state);
+  const lead=next.leads.find(item=>item.id===leadId)!;
+  Object.assign(lead,contact,{details});
+  event(next,'Enquiry details updated',`${lead.name} · Customer and job details updated`,'system',lead.id);
+  return {state:next};
 }
 export function transition(state:State,leadId:string,action:'quote'|'accept'|'invoice'|'paid'|'close'):State {
   const next=clone(state); const lead=next.leads.find(l=>l.id===leadId); if(!lead) return state;

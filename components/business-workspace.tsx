@@ -9,9 +9,11 @@ import { CustomerRecord } from './customer-record';
 import { EnquiryForm } from './enquiry-form';
 import { WorkspaceSettings } from './workspace-settings';
 import { ThemeToggle } from './theme-provider';
+import { FollowupStatus } from './followup-status';
+import { getFollowup, selectEnquiries, type EnquirySort, type FollowupFilter } from '@/lib/enquiry-list';
 import { formatQuantity, getIndustry } from '@/lib/industries';
 import { useServerWorkspace } from '@/hooks/use-server-workspace';
-import { addLead, exportCsv, money, total, transition, type LeadInput, type Status } from '@/lib/automation';
+import { addLead, exportCsv, money, total, transition, updateLead, type LeadInput, type Status } from '@/lib/automation';
 
 type View = 'overview' | 'enquiries' | 'automations' | 'team';
 const navigation = [
@@ -34,7 +36,9 @@ export function BusinessWorkspace({ session, onSignedOut, onSessionChanged }: { 
   const [view, setView] = useState<View>('overview');
   const [menuOpen, setMenuOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [status, setStatus] = useState('All');
+  const [status, setStatus] = useState<Status | 'All'>('All');
+  const [followupFilter, setFollowupFilter] = useState<FollowupFilter>('all');
+  const [sort, setSort] = useState<EnquirySort>('newest');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [notice, setNotice] = useState('');
@@ -42,9 +46,12 @@ export function BusinessWorkspace({ session, onSignedOut, onSessionChanged }: { 
   const [switching, setSwitching] = useState(false);
   const selected = state.leads.find(lead => lead.id === selectedId) ?? null;
   const open = state.leads.filter(lead => !['Paid', 'Closed'].includes(lead.status));
-  const followups = state.leads.filter(lead => lead.status === 'Quoted' && lead.followupAt !== undefined);
+  const followups = state.leads.filter(lead => ['due', 'ready'].includes(getFollowup(lead, state.settings, state.now, state.rules.followup).status));
   const invoices = state.leads.filter(lead => lead.status === 'Invoiced');
-  const filtered = state.leads.filter(lead => (status === 'All' || status === lead.status) && `${lead.name} ${lead.email} ${lead.service}`.toLowerCase().includes(query.trim().toLowerCase()));
+  const filtered = selectEnquiries(state, { query, status, followup: followupFilter, sort });
+  const hasFilters = !!query.trim() || status !== 'All' || followupFilter !== 'all';
+
+  function clearFilters() { setQuery(''); setStatus('All'); setFollowupFilter('all'); }
 
   function navigate(next: View) { setView(next); setMenuOpen(false); setNotice(''); }
   async function capture(input: LeadInput) {
@@ -79,9 +86,9 @@ export function BusinessWorkspace({ session, onSignedOut, onSessionChanged }: { 
     finally { setSwitching(false); }
   }
   const createButton = <button className="btn primary" onClick={() => { clearError(); setCreating(true); }}><Plus size={17}/>New enquiry</button>;
-  const table = (items = filtered) => <div className="table-scroll"><table className="lead-table live-table"><caption className="sr-only">Customer enquiries and their next step</caption><thead><tr><th>Customer</th><th>Service</th><th>Status</th><th className="right">Total CAD</th><th><span className="sr-only">Open record</span></th></tr></thead><tbody>
-    {items.map(lead => <tr key={lead.id}><td><button className="customer" onClick={() => setSelectedId(lead.id)}><span className="live-avatar">{lead.name.slice(0, 1).toUpperCase()}</span><span><strong>{lead.name}</strong><small>{lead.email}</small></span></button></td><td>{lead.service}<small>{formatQuantity(lead)}</small></td><td><span className={`badge badge-${lead.status.toLowerCase()}`}>{labels[lead.status]}</span></td><td className="right">{money(total(lead))}</td><td><button className="icon-button" aria-label={`Open ${lead.name}`} onClick={() => setSelectedId(lead.id)}><ArrowUpRight size={18}/></button></td></tr>)}
-  </tbody></table>{!items.length && <div className="live-empty"><Inbox size={30}/><h3>{state.leads.length ? 'No matching enquiries' : 'Your next customer starts here.'}</h3><p>{state.leads.length ? 'Try another name, service, or status.' : 'Add an enquiry to prepare a quote and keep every next step together.'}</p>{state.leads.length ? <button className="btn secondary" onClick={() => { setQuery(''); setStatus('All'); }}>Clear filters</button> : createButton}</div>}</div>;
+  const table = (items = filtered) => <div className="table-scroll"><table className="lead-table live-table"><caption className="sr-only">Customer enquiries and their next step</caption><thead><tr><th>Customer</th><th>Service</th><th>Status</th><th>Follow-up</th><th className="right">Total CAD</th><th><span className="sr-only">Open record</span></th></tr></thead><tbody>
+    {items.map(lead => <tr key={lead.id}><td><button className="customer" onClick={() => setSelectedId(lead.id)}><span className="live-avatar">{lead.name.slice(0, 1).toUpperCase()}</span><span><strong>{lead.name}</strong><small>{lead.email}</small></span></button></td><td>{lead.service}<small>{formatQuantity(lead)}</small></td><td><span className={`badge badge-${lead.status.toLowerCase()}`}>{labels[lead.status]}</span></td><td className="followup-cell"><FollowupStatus followup={getFollowup(lead, state.settings, state.now, state.rules.followup)}/></td><td className="right">{money(total(lead))}</td><td><button className="icon-button" aria-label={`Open ${lead.name}`} onClick={() => setSelectedId(lead.id)}><ArrowUpRight size={18}/></button></td></tr>)}
+  </tbody></table>{!items.length && <div className="live-empty"><Inbox size={30}/><h3>{state.leads.length ? 'No matching enquiries' : 'Your next customer starts here.'}</h3><p>{state.leads.length ? 'Try another search or adjust the status and follow-up filters.' : 'Add an enquiry to prepare a quote and keep every next step together.'}</p>{state.leads.length ? <button className="btn secondary" onClick={clearFilters}>Clear filters</button> : createButton}</div>}</div>;
 
   return <div className="app-shell live-app"><a className="skip-link" href="#workspace-content">Skip to content</a>
     {menuOpen && <button className="mobile-scrim" onClick={() => setMenuOpen(false)} aria-label="Close navigation"/>}
@@ -100,17 +107,35 @@ export function BusinessWorkspace({ session, onSignedOut, onSessionChanged }: { 
         {!connected && <div className="app-alert">Unable to refresh records. Reconnect before making changes.<button className="link-button" onClick={refresh}>Try again</button></div>}
         {view === 'overview' && <>
           <section className="live-welcome"><div><span className="section-kicker">YOUR BUSINESS, WITH A LITTLE MORE FLOW</span><h2>Good work starts<br/>with a clear next step.</h2><p>{open.length ? `${open.length} open ${open.length === 1 ? 'enquiry needs' : 'enquiries need'} your attention. Let’s keep things moving.` : 'Your workspace is ready. Capture your first enquiry and let the details fall into place.'}</p><button className="btn dark" onClick={() => open.length ? navigate('enquiries') : setCreating(true)}>{open.length ? 'View your enquiries' : 'Add your first enquiry'}<ArrowRight size={17}/></button></div><div className="live-flow">{[{ icon: Inbox, name: 'Enquiry captured', sub: 'The details, all together' }, { icon: FileText, name: 'Quote prepared', sub: 'Your pricing. Your approval.' }, { icon: Check, name: 'Job well done', sub: 'An invoice and a clear record' }].map(({ icon: Icon, name, sub }, index) => <div key={name}><span className="live-flow-number">0{index + 1}</span><Icon size={21}/><span><strong>{name}</strong><small>{sub}</small></span><Check size={15}/></div>)}</div></section>
-          <section className="stats-grid live-stats" aria-label="Business summary">{[{ label: 'Open enquiries', value: open.length, note: 'Ready for the next step' }, { label: 'Open quote value', value: money(open.reduce((sum, lead) => sum + lead.amount, 0)), note: 'Before tax · CAD' }, { label: 'Follow-ups ready', value: followups.length, note: 'Drafts waiting for review' }, { label: 'Outstanding invoices', value: money(invoices.reduce((sum, lead) => sum + total(lead), 0)), note: `${invoices.length} awaiting payment` }].map(metric => <article className="stat" key={metric.label}><div className="stat-label">{metric.label}</div><strong>{metric.value}</strong><p>{metric.note}</p></article>)}</section>
+          <section className="stats-grid live-stats" aria-label="Business summary">{[{ label: 'Open enquiries', value: open.length, note: 'Ready for the next step' }, { label: 'Open quote value', value: money(open.reduce((sum, lead) => sum + lead.amount, 0)), note: 'Before tax · CAD' }, { label: 'Follow-ups to review', value: followups.length, note: 'Drafts ready or due' }, { label: 'Outstanding invoices', value: money(invoices.reduce((sum, lead) => sum + total(lead), 0)), note: `${invoices.length} awaiting payment` }].map(metric => <article className="stat" key={metric.label}><div className="stat-label">{metric.label}</div><strong>{metric.value}</strong><p>{metric.note}</p>{metric.label === 'Follow-ups to review' && <button className="link-button metric-link" onClick={() => { clearFilters(); setFollowupFilter('attention'); navigate('enquiries'); }}>Review follow-ups<ArrowRight size={14}/></button>}</article>)}</section>
           <div className="dashboard-grid"><section className="panel"><div className="panel-heading"><div><h2>Recent enquiries</h2><p>Small details. Clear next steps.</p></div><button className="link-button" onClick={() => navigate('enquiries')}>View all<ArrowUpRight size={15}/></button></div>{table(state.leads.slice(0, 5))}</section><section className="panel"><div className="panel-heading"><div><h2>Latest activity</h2><p>A shared record of your team’s work.</p></div></div><div className="live-activity">{state.activity.slice(0, 6).map(item => <div key={item.id}><span className="activity-icon"><Workflow size={16}/></span><div>{item.leadId ? <button onClick={() => setSelectedId(item.leadId!)}>{item.title}</button> : <strong>{item.title}</strong>}<p>{item.detail}</p><small>{new Date(item.at).toLocaleString('en-CA', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</small></div></div>)}{!state.activity.length && <div className="quiet-empty">Your first enquiry starts the story. Activity will appear here as your team works.</div>}</div></section></div>
         </>}
-        {view === 'enquiries' && <section className="panel"><div className="table-toolbar"><div className="search-field"><Search size={18}/><input aria-label="Search enquiries" placeholder="Search customers or services…" value={query} onChange={event => setQuery(event.target.value)}/></div><select className="live-select" aria-label="Filter by status" value={status} onChange={event => setStatus(event.target.value)}><option>All</option>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><button className="btn secondary" onClick={() => downloadFile(exportCsv(filtered), 'donekite-enquiries.csv', 'text/csv;charset=utf-8;')}><Download size={16}/>Export CSV</button></div>{table()}<div className="panel-footer">{filtered.length} of {state.leads.length} enquiries<span>Amounts include tax · CAD</span></div></section>}
+        {view === 'enquiries' && <section className="panel">
+          <div className="table-toolbar enquiry-toolbar">
+            <div className="search-field"><Search size={18}/><input aria-label="Search enquiries" placeholder="Search customer, job details, or notes…" value={query} onChange={event => setQuery(event.target.value)}/></div>
+            <label className="enquiry-filter">Status<select className="live-select" value={status} onChange={event => setStatus(event.target.value as Status | 'All')}><option value="All">All statuses</option>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+            <label className="enquiry-filter">Follow-up<select className="live-select" value={followupFilter} onChange={event => setFollowupFilter(event.target.value as FollowupFilter)}><option value="all">All follow-ups</option><option value="attention">Ready or due</option><option value="scheduled">Scheduled</option><option value="paused">Paused</option></select></label>
+            <label className="enquiry-filter">Sort by<select className="live-select" value={sort} onChange={event => setSort(event.target.value as EnquirySort)}><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="customer">Customer A–Z</option><option value="amount-high">Highest total</option><option value="amount-low">Lowest total</option></select></label>
+            <button className="btn secondary" disabled={!filtered.length} onClick={() => downloadFile(exportCsv(filtered), 'donekite-enquiries.csv', 'text/csv;charset=utf-8;')}><Download size={16}/>Export CSV</button>
+          </div>
+          <div className="enquiry-filter-summary"><p role="status">Showing {filtered.length} of {state.leads.length} enquiries</p>{hasFilters && <button className="link-button" onClick={clearFilters}>Clear filters<X size={14}/></button>}</div>
+          {table()}<div className="panel-footer">CSV includes the current filtered list<span>Amounts include tax · CAD</span></div>
+        </section>}
         {view === 'automations' && <WorkspaceSettings state={state} saving={saving} mutate={mutate} error={error}/>}
         {view === 'team' && <Team session={session}/>}
         <footer className="live-footer"><span>donekite · Less admin, more business.</span><span>Shared records · Your team stays in control</span></footer>
       </main>
     </div>
     <AppDialog open={creating} onClose={() => !saving && setCreating(false)} title="New enquiry">{creating && <EnquiryForm state={state} saving={saving} error={error} onSubmit={capture} onCancel={() => setCreating(false)}/>}</AppDialog>
-    <CustomerRecord lead={selected} businessName={session.workspace.name} activity={state.activity.filter(item => item.leadId === selectedId)} saving={saving} error={error} onClose={() => setSelectedId(null)} onAction={async action => { const ok = await mutate(current => transition(current, selectedId!, action)); if (ok) setNotice('Customer record updated.'); return ok; }}/>
+    <CustomerRecord lead={selected} businessName={session.workspace.name} activity={state.activity.filter(item => item.leadId === selectedId)} saving={saving} error={error} followup={selected ? getFollowup(selected, state.settings, state.now, state.rules.followup) : undefined} onCheckFollowup={refresh} onClose={() => setSelectedId(null)} onAction={async action => { const ok = await mutate(current => transition(current, selectedId!, action)); if (ok) setNotice('Customer record updated.'); return ok; }} onEdit={async (input, expected) => {
+      const ok = await mutate(current => {
+        const result = updateLead(current, selectedId!, input, expected);
+        if (result.error) throw new Error(result.error);
+        return result.state;
+      });
+      if (ok) setNotice('Enquiry details saved.');
+      return ok;
+    }}/>
   </div>;
 }
 

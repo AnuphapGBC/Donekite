@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addLead, makeSeed } from '../lib/automation.ts';
+import { addLead, makeSeed, updateLead } from '../lib/automation.ts';
 import { createIndustrySettings, formatQuantity, getCatalog } from '../lib/industries.ts';
 import { AppError } from '../lib/server/errors.ts';
 import { WorkspaceStore } from '../lib/server/store.ts';
@@ -24,7 +24,13 @@ test('industry answers and original pricing survive PostgreSQL saves, template c
     assert.equal(captured.error, undefined);
     const saved = await store.saveWorkspace(owner.token, captured.state, initial.revision);
     const changed = { ...saved.state, settings: createIndustrySettings('professional', saved.state.settings) };
-    await store.saveWorkspace(owner.token, changed, saved.revision);
+    const switched = await store.saveWorkspace(owner.token, changed, saved.revision);
+    const edit = updateLead(switched.state, captured.id!, {
+      name: 'Updated Event Customer', email: 'updated@example.com', source: 'Referral', notes: 'Use the side entrance',
+      details: { eventDate: '2027-06-12', location: 'Updated venue', guestCount: '40' },
+    });
+    assert.equal(edit.error, undefined);
+    await store.saveWorkspace(owner.token, edit.state, switched.revision);
     const invitation = await store.createInvitation(owner.token, 'member@example.com');
     const member = await store.register({ ...account, email: 'member@example.com', inviteToken: invitation.token, industry: 'general' });
     const shared = await store.readWorkspace(member.token);
@@ -33,7 +39,11 @@ test('industry answers and original pricing survive PostgreSQL saves, template c
     assert.equal(lead.industry, 'events');
     assert.equal(formatQuantity(lead), '40 guests');
     assert.equal(lead.amount, 1400);
-    assert.deepEqual(lead.details, { eventDate: '2027-06-12', location: 'Town hall', guestCount: '40' });
+    assert.equal(lead.name, 'Updated Event Customer');
+    assert.equal(lead.email, 'updated@example.com');
+    assert.equal(lead.notes, 'Use the side entrance');
+    assert.deepEqual(lead.details, { eventDate: '2027-06-12', location: 'Updated venue', guestCount: '40' });
+    assert.ok(shared.state.activity.some(item => item.leadId === captured.id && item.title === 'Enquiry details updated'));
     assert.equal(shared.workspace.id, initial.workspace.id);
   } finally { await store.close(); }
 });

@@ -29,6 +29,14 @@ New enquiries ask questions for the selected industry, such as vehicle details, 
 
 Use the theme button on the sign-in screen or workspace header to toggle light and dark appearance. It starts with your device preference and remembers your choice in that browser. Printed documents use a white background.
 
+## Keep enquiries up to date
+
+Open an enquiry and select **Edit details** to update the customer, contact information, source, notes, and industry answers. The saved service, quantity, price, and workflow status stay attached to the record. Edits appear in its history and are shared with your team. If a teammate changes the same details, load the latest version before saving.
+
+The enquiry list searches customer information, service names, notes, and job details. Combine status and follow-up filters, then sort by date, customer name, or total amount. CSV export follows the current filters and sort order.
+
+Follow-up indicators show scheduled, due, ready, and paused reminders. **Review follow-ups** on the overview opens the enquiries that need attention. Draft preparation still runs when the workspace loads or refreshes; review and send emails using your email app.
+
 ## Check and build
 
 ```sh

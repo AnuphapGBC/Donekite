@@ -6,13 +6,20 @@
   --accent: #3f6b50;
   --accent-surface: #eaf0df;
   --control-line: #81927b;
+  --warning-ink: #736133;
+  --warning-surface: #f4f0e5;
+  --danger-ink: #873f28;
+  --danger-surface: #fff7f1;
+  --info-ink: #47658b;
+  --info-surface: #e9eff7;
   --theme-muted: var(--muted);
   --theme-warning-ink: #736133;
   --theme-danger-ink: #873f28;
   --theme-info-ink: #47658b;
 }
 
-/* Surface fallbacks retain the original light palette. */
+/* Both themes define the same semantic tokens; component rules have no light
+   fallback colors that can leak into a dark workspace. */
 :root[data-theme='dark'] {
   color-scheme: dark;
   --ink: #e5eddf;
@@ -29,6 +36,12 @@
   --accent: #bdd7aa;
   --accent-surface: #293d2c;
   --control-line: #70816f;
+  --warning-ink: #edc47e;
+  --warning-surface: #3a3021;
+  --danger-ink: #ffbca7;
+  --danger-surface: #3c2924;
+  --info-ink: #b0cbea;
+  --info-surface: #283548;
   --theme-surface: var(--surface);
   --theme-soft: var(--surface-soft);
   --theme-accent-surface: var(--accent-surface);
@@ -41,6 +54,24 @@
   --theme-danger-surface: #3c2924;
   --theme-info-ink: #b0cbea;
   --theme-info-surface: #283548;
+}
+
+/* Keep primary surfaces correct even alongside older global component rules. */
+:root[data-theme='dark'] :is(.sidebar, .topbar, .stat, .panel, .workspace,
+  .flow-node, .live-flow > div, .modal, .modal-header, .quote-letter,
+  .workspace-backup, .auth-shell, .auth-steps li, .live-select,
+  .btn.secondary, .live-form input, .live-form select, .live-form textarea,
+  .enquiry-form input, .enquiry-form select, .enquiry-form textarea,
+  .auth-field input, .auth-field select, .invite-result input) {
+  background-color: var(--surface);
+}
+:root[data-theme='dark'] :is(.lead-table th, .record-document-table th,
+  .record-notes, .record-actions, .count-tag, .profile-avatar) {
+  background-color: var(--surface-soft);
+}
+:root[data-theme='dark'] :is(.nav-item.active, .nav-count, .workspace-icon,
+  .auth-story, .auth-step-icon, .hero-panel, .live-welcome, .record-followup) {
+  background-color: var(--accent-surface);
 }
 
 .theme-toggle {
@@ -109,6 +140,12 @@
     --accent: #3f6b50;
     --accent-surface: #eaf0df;
     --control-line: #cfd9c5;
+    --warning-ink: #736133;
+    --warning-surface: #f4f0e5;
+    --danger-ink: #873f28;
+    --danger-surface: #fff7f1;
+    --info-ink: #47658b;
+    --info-surface: #e9eff7;
     --background: #fff;
     --foreground: #243a30;
     --theme-surface: #fff;
