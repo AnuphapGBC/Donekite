@@ -4,6 +4,8 @@ import {useEffect,useRef,useState,useSyncExternalStore,type FormEvent} from 'rea
 import Link from 'next/link';
 import {ArrowRight,Check,Eye,EyeOff,FileText,Inbox,LoaderCircle,Receipt,Users} from 'lucide-react';
 import {parseSaved,type State} from '@/lib/automation';
+import {industries,type IndustryId} from '@/lib/industries';
+import {ThemeToggle} from '@/components/theme-provider';
 
 export type Session = {
   user:{id:string;name:string;email:string};
@@ -40,6 +42,7 @@ export function AuthScreen({onAuthenticated}:AuthScreenProps) {
   const [mode,setMode]=useState<'login'|'register'>('login');
   const [name,setName]=useState('');
   const [businessName,setBusinessName]=useState('');
+  const [industry,setIndustry]=useState<IndustryId>('general');
   const [email,setEmail]=useState('');
   const [password,setPassword]=useState('');
   const [showPassword,setShowPassword]=useState(false);
@@ -88,7 +91,7 @@ export function AuthScreen({onAuthenticated}:AuthScreenProps) {
     try {
       const response=await fetch(`/api/auth/${mode}`,{
         method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',
-        body:JSON.stringify({email:email.trim(),password,...(mode==='register'?{name:name.trim(),businessName:businessName.trim()}:{}),...(inviteToken?{inviteToken}:{})}),
+        body:JSON.stringify({email:email.trim(),password,...(mode==='register'?{name:name.trim(),businessName:businessName.trim(),industry}:{}),...(inviteToken?{inviteToken}:{})}),
       });
       let data=await response.json().catch(()=>null);
       if(!response.ok) throw new Error(responseError(data,'Unable to continue. Please try again.'));
@@ -129,6 +132,7 @@ export function AuthScreen({onAuthenticated}:AuthScreenProps) {
     </section>
 
     <section className="auth-card" aria-labelledby="auth-form-title">
+      <div className="auth-theme-control"><ThemeToggle/></div>
       <div className="auth-form-heading">
         <p className="auth-eyebrow">YOUR BUSINESS, IN GOOD ORDER</p>
         <h2 id="auth-form-title">{invitation?`Join ${invitation.workspaceName}`:registering?'Make room for better work.':'Welcome back.'}</h2>
@@ -145,6 +149,7 @@ export function AuthScreen({onAuthenticated}:AuthScreenProps) {
         <fieldset disabled={busy||inviteLoading||!!inviteError}>
           {registering&&<label className="auth-field" htmlFor="auth-name">Your name<input id="auth-name" name="name" autoComplete="name" required maxLength={100} value={name} onChange={event=>setName(event.target.value)} placeholder="Alex Morgan"/></label>}
           {registering&&!inviteToken&&<label className="auth-field" htmlFor="auth-business">Business name<input id="auth-business" name="businessName" autoComplete="organization" required maxLength={100} value={businessName} onChange={event=>setBusinessName(event.target.value)} placeholder="Your business"/></label>}
+          {registering&&!inviteToken&&<label className="auth-field" htmlFor="auth-industry">Industry<select id="auth-industry" name="industry" value={industry} onChange={event=>setIndustry(event.target.value as IndustryId)}>{industries.map(preset=><option key={preset.id} value={preset.id}>{preset.label}</option>)}</select><small>Sets your enquiry fields and starter services. You can customize them later.</small></label>}
           <label className="auth-field" htmlFor="auth-email">Email address<input id="auth-email" name="email" type="email" autoComplete="email" required maxLength={150} readOnly={!!invitation} value={email} onChange={event=>setEmail(event.target.value)} placeholder="you@business.com"/></label>
           <label className="auth-field" htmlFor="auth-password">Password
             <span className="auth-password"><input id="auth-password" name="password" type={showPassword?'text':'password'} autoComplete={registering?'new-password':'current-password'} required minLength={registering?12:undefined} maxLength={128} aria-describedby={registering?'auth-password-hint':undefined} value={password} onChange={event=>setPassword(event.target.value)}/><button type="button" className="auth-password-toggle" aria-label={showPassword?'Hide password':'Show password'} aria-pressed={showPassword} onClick={()=>setShowPassword(visible=>!visible)}>{showPassword?<EyeOff size={18} aria-hidden="true"/>:<Eye size={18} aria-hidden="true"/>}</button></span>

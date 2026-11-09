@@ -8,6 +8,8 @@ The original project was a React automation showcase with fictional customers, s
 
 - Added registration, password sign-in, logout, expiring server sessions, and empty business workspaces.
 - Connected account and workspace storage to Neon PostgreSQL, replacing the local SQLite implementation.
+- Added seven industry templates, dynamic enquiry questions, and editable services, rates, quantity labels, limits, and increments. Industry settings and enquiry answers are shared through Neon; historical quotes retain their original details and amounts.
+- Added light and dark appearance with device preference, a browser-persisted toggle, and white document printing.
 - Added versioned SQL migrations under `db/migrations/`, connection checks, and a GitHub Actions workflow.
 - Added workspace membership, owner-created invitation links, and workspace switching for accounts that belong to multiple businesses.
 - Added revision checks to prevent stale writes from silently overwriting another teammate’s changes.
@@ -41,11 +43,15 @@ npm run typecheck
 npm run build
 ```
 
-The test suite covers pricing and tax, workflow transitions, duplicate detection, reminder timing, CSV escaping, saved-state validation, persistent account data, session expiry and revocation, tenancy, invitation restrictions, revision conflicts, request boundaries, and demo backups. Check terminal output for the result of each command; this document does not certify a deployment.
+The test suite covers pricing and tax, industry templates and answers, fractional quantities, historical service snapshots, migration compatibility, workflow transitions, duplicate detection, reminder timing, CSV escaping, saved-state validation, persistent account data, session expiry and revocation, tenancy, invitation restrictions, revision conflicts, request boundaries, and demo backups. Check terminal output for the result of each command; this document does not certify a deployment.
 
 The PostgreSQL tests use an isolated PostgreSQL engine through PGlite and do not need the live Neon database or customer credentials. GitHub Actions runs installation, tests, lint, typechecking, and the build without database secrets. Migration and connectivity are separate operational checks: `npm run db:migrate` and `npm run db:check`.
 
 On November 8, 2026, the PostgreSQL version passed all 40 tests, lint, TypeScript checking, and the production build. The schema migration was applied to the supplied Neon database and a second run confirmed it was up to date. A live Neon transaction verified accounts, shared records, invitations, revision conflicts, and login/logout; all QA writes were rolled back. Browser automation was unavailable, so visual layout, keyboard interaction, and print output still need a manual browser check.
+
+On November 9, 2026, the industry and theme update passed all 52 tests, lint, TypeScript checking, and the production build. Migration `0002_workspace_industry.sql` was applied to the connected `donekite` database. It makes older workspaces' cleaning template explicit without rewriting rates or enquiries. A live Neon transaction verified dynamic answers, changed industry settings, original event quantities and prices, and teammate access; all QA writes were rolled back.
+
+Isolated headless Edge checks also passed for the light/dark toggle and reload persistence, template changes, saves with reordered JSONB keys, required event questions, a 40-guest catering quote, and a blank form after reopening. The enquiry dialog fit a 375px viewport without horizontal page overflow, and no console or hydration errors were observed. Browser API responses were mocked for these checks, so they created no real accounts or customer data. Physical print output still needs a manual check.
 
 During the simplification review, deliberately reversing the workspace identity guard caused the API regression test to fail; the original guard was restored immediately. This confirms that the test detects that cross-workspace write failure.
 

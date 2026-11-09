@@ -2,7 +2,7 @@
 
 A web application for service businesses to manage customer enquiries, prepare quotes, track invoices, and share records with a team.
 
-The main workspace has account registration and sign-in, Neon PostgreSQL storage, separate business workspaces, team invitation links, configurable rates and rules, activity history, and CSV export. Quote and invoice documents can be printed or opened as drafts in your email app. Payment recording tracks a payment received elsewhere; it does not charge a customer.
+The main workspace has account registration and sign-in, Neon PostgreSQL storage, separate business workspaces, team invitation links, industry-specific enquiries, configurable services and rules, activity history, and CSV export. Quote and invoice documents can be printed or opened as drafts in your email app. Payment recording tracks a payment received elsewhere; it does not charge a customer.
 
 ## Run locally
 
@@ -20,6 +20,14 @@ Before running the migration and development commands, copy `.env.example` to `.
 Open the address printed in the terminal, normally **http://127.0.0.1:3000**. Select **Create account** to create an empty business workspace. No preconfigured account is required.
 
 For a sample presentation, open **/demo**. Its fictional records and simulated clock are separate from signed-in business data. Demo records remain in that browser’s local storage and support JSON backup and restore.
+
+## Industries and appearance
+
+Choose cleaning, landscaping, trades and repairs, auto detailing, events, professional services, or general services when creating a workspace. In **Rules & pricing**, you can change industry, edit or add services, set rates and quantity units, and configure quantity limits and increments. Industry templates provide starter prices; review them before quoting customers.
+
+New enquiries ask questions for the selected industry, such as vehicle details, an event date, or a project brief. Industry settings and enquiry answers are saved in Neon and shared with your team. Existing enquiries retain their original service, quantity labels, answers, and agreed prices when you change templates or services. The industry migration assigns older workspaces their original cleaning template without changing their prices.
+
+Use the theme button on the sign-in screen or workspace header to toggle light and dark appearance. It starts with your device preference and remembers your choice in that browser. Printed documents use a white background.
 
 ## Check and build
 
@@ -70,6 +78,7 @@ This implementation needs operational setup before public customer use, includin
 | `lib/server/` and `app/api/` | Authentication, sessions, PostgreSQL storage, and workspace APIs |
 | `db/migrations/` | Versioned PostgreSQL schema migrations |
 | `lib/automation.ts` | Pricing snapshots, validation, workflow rules, follow-ups, and CSV export |
+| `lib/industries.ts` | Industry templates, service catalogs, and quantity labels |
 | `app/demo/page.tsx` | Separate guided demo using fictional browser-local data |
 | `tests/` | Business-rule, storage, authentication, and HTTP boundary regression tests |
 

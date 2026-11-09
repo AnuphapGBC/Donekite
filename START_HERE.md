@@ -17,19 +17,21 @@ npm run dev
 ```
 
 5. Open the address printed by the terminal, normally **http://127.0.0.1:3000**.
-6. Choose **Create account**, enter your business name, and use a password of at least 12 characters.
+6. Choose **Create account**, enter your business name, select your industry, and use a password of at least 12 characters.
 
 Your business starts with an empty workspace. Accounts and customer records are saved in PostgreSQL. Signing into the same account from another browser connects to the same shared records. Keep `.env.local` private; it is excluded from Git.
 
 ## Try the customer workflow
 
-1. Add a **New enquiry** with the customer, service, scope, and notes.
+1. Add a **New enquiry** with the customer, service, quantity, and industry details.
 2. Open its quote and review the saved price and tax.
 3. Print the quote or open an email draft. Send it using your own email app, then select **Mark quote sent**.
 4. After the customer agrees, select **Record acceptance**. The invoice rule can prepare the invoice automatically.
 5. Review and share the invoice. Select **Record payment** only after receiving payment elsewhere.
 
-Use **Rules & pricing** to change rates, tax, follow-up delay, or draft preparation rules. Existing quotes retain their saved prices. Follow-ups are checked when the workspace loads or refreshes.
+Use **Rules & pricing** to select an industry and customize services, rates, quantity labels, limits, and increments. Review starter prices before using them. You can also change tax, follow-up delay, or draft preparation rules. Save your settings to share them with the team through Neon. Existing enquiries retain their original details and saved prices. Follow-ups are checked when the workspace loads or refreshes.
+
+The theme button switches between light and dark appearance and remembers your choice in this browser. Before choosing a theme, the app follows your device preference.
 
 ## Work with a teammate
 

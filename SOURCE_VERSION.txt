@@ -1,5 +1,0 @@
-DoneKite Automation — project source
-Source commit: f94fb0d29e10b0ccd9d97f99c5356e3fada95c79
-Demo: https://donekite.pekkychan.chatgpt.site
-
-Tagline: Less admin. More business.

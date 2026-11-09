@@ -1,0 +1,53 @@
+.industry-enquiry .industry-details { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--line); }
+.industry-details h3 { font-size: 14px; font-weight: 600; margin-bottom: 16px; }
+.industry-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.industry-detail-grid label { align-content: start; }
+.industry-detail-grid .optional { display: inline; }
+.industry-enquiry .industry-field-help { color: var(--muted); font-size: 11px; font-weight: 400; line-height: 1.6; }
+.industry-settings .panel-heading { padding: 24px; }
+.industry-settings .live-form label { gap: 8px; min-width: 0; }
+.industry-settings .live-form input, .industry-settings .live-form select { background: var(--surface); color: var(--ink); border-color: var(--control-line, var(--line)); }
+.industry-template { padding: 0 24px 24px; border-bottom: 1px solid var(--line); }
+.industry-template > label { max-width: 420px; }
+.industry-template > p { font-size: 13px; line-height: 1.8; color: var(--muted); margin-top: 12px; }
+.industry-template .industry-template-note { font-size: 12px; }
+.industry-template .industry-draft-note { color: var(--ink); padding: 12px 16px; background: var(--canvas); border: 1px solid var(--line); border-radius: 6px; }
+.industry-question-preview { margin-top: 20px; font-size: 12px; }
+.industry-question-preview strong { font-weight: 600; }
+.industry-question-preview ul { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; margin: 12px 0 0; padding: 0; }
+.industry-question-preview li { padding: 6px 10px; border: 1px solid var(--line); background: var(--canvas); color: var(--muted); border-radius: 4px; line-height: 1.5; }
+.industry-service-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 24px 24px 16px; }
+.industry-service-heading h3 { font-size: 14px; font-weight: 600; }
+.industry-service-heading p, .industry-service-heading > span { font-size: 12px; color: var(--muted); line-height: 1.7; }
+.industry-service-heading p { margin-top: 4px; }
+.industry-service-heading > span { white-space: nowrap; }
+.industry-service-list { display: grid; gap: 16px; padding: 0 24px; }
+.industry-service { border: 1px solid var(--line); border-radius: 8px; padding: 16px; min-width: 0; }
+.industry-service-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 12px; }
+.industry-service-title strong { font-size: 12px; color: var(--muted); }
+.industry-service-title .icon-button { min-width: 40px; min-height: 40px; }
+.industry-service-fields { display: grid; grid-template-columns: minmax(180px, 2fr) repeat(3, minmax(100px, 1fr)); gap: 16px; align-items: start; }
+.industry-service-fields label { font-size: 12px; }
+.industry-service-fields .industry-quantity-help { color: var(--muted); font-size: 11px; font-weight: 400; line-height: 1.6; }
+.industry-add-service { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 20px 24px 24px; }
+.industry-add-service small { color: var(--muted); font-size: 12px; line-height: 1.7; }
+.industry-settings-footer { padding-top: 24px; border-top: 1px solid var(--line); }
+.industry-save { margin-left: auto; display: grid; justify-items: end; gap: 8px; }
+.industry-save > span { color: var(--muted); font-size: 11px; }
+.industry-settings-message { padding: 0 24px 24px; margin: 0; }
+@media (max-width: 1100px) {
+  .industry-service-fields { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+@media (max-width: 600px) {
+  .industry-detail-grid { grid-template-columns: minmax(0, 1fr); }
+  .industry-settings .panel-heading { padding: 20px; }
+  .industry-template { padding: 0 20px 20px; }
+  .industry-service-heading { padding: 20px 20px 16px; align-items: flex-start; }
+  .industry-service-list { padding: 0 20px; }
+  .industry-service-fields { grid-template-columns: minmax(0, 1fr); }
+  .industry-add-service { padding: 16px 20px 20px; }
+  .industry-settings-footer { padding-top: 20px; }
+  .industry-save { flex-basis: 100%; justify-items: stretch; margin-left: 0; }
+  .industry-save > span { text-align: right; }
+  .industry-settings-message { padding: 0 20px 20px; }
+}

@@ -1,5 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { defaultSettings, parseSaved, runFollowups, type State } from '../automation.ts';
+import { parseSaved, runFollowups, type State } from '../automation.ts';
+import { createIndustrySettings, industries, type IndustryId } from '../industries.ts';
 import { createPostgresDatabase, type Database, type SqlClient } from './database.ts';
 import { AppError } from './errors.ts';
 import { dummyPasswordHash, hashPassword, verifyPassword } from './passwords.ts';
@@ -35,8 +36,8 @@ function passwordInput(value: unknown, registration = false): string {
   if (typeof value !== 'string' || value.length > 128 || value.length < (registration ? 12 : 1)) throw new AppError(400, registration ? 'Use a password between 12 and 128 characters.' : 'Enter your password.');
   return value;
 }
-function emptyState(now: number): State {
-  return { version: 1, now, leads: [], activity: [], rules: { draftQuote: true, followup: true, invoice: true }, settings: structuredClone(defaultSettings) };
+function emptyState(now: number, industry: IndustryId = 'cleaning'): State {
+  return { version: 1, now, leads: [], activity: [], rules: { draftQuote: true, followup: true, invoice: true }, settings: createIndustrySettings(industry) };
 }
 
 export class WorkspaceStore {
@@ -72,6 +73,8 @@ export class WorkspaceStore {
     const password = passwordInput(input.password, true);
     const inviteToken = typeof input.inviteToken === 'string' ? input.inviteToken : undefined;
     const businessName = inviteToken ? undefined : requiredText(input.businessName, 'Business name', 100);
+    const industry = input.industry ?? 'cleaning';
+    if (typeof industry !== 'string' || !industries.some(preset => preset.id === industry)) throw new AppError(400, 'Choose an available industry.');
     await this.attempt('register:' + email);
     const passwordHash = await hashPassword(password);
     try {
@@ -83,7 +86,7 @@ export class WorkspaceStore {
         const workspaceId = invitation?.workspace_id ?? randomUUID();
         const now = this.clock();
         await db.query('INSERT INTO donekite.users(id, name, email, password_hash, created_at) VALUES ($1, $2, $3, $4, $5)', [userId, name, email, passwordHash, now]);
-        if (!invitation) await db.query('INSERT INTO donekite.workspaces(id, name, state, created_at) VALUES ($1, $2, $3::jsonb, $4)', [workspaceId, businessName!, JSON.stringify(emptyState(now)), now]);
+        if (!invitation) await db.query('INSERT INTO donekite.workspaces(id, name, state, created_at) VALUES ($1, $2, $3::jsonb, $4)', [workspaceId, businessName!, JSON.stringify(emptyState(now, industry as IndustryId)), now]);
         await db.query('INSERT INTO donekite.memberships(user_id, workspace_id, role) VALUES ($1, $2, $3)', [userId, workspaceId, invitation ? 'member' : 'owner']);
         if (invitation) await db.query('UPDATE donekite.invitations SET used_at = $1 WHERE token_hash = $2', [now, invitation.token_hash]);
         await db.query('DELETE FROM donekite.auth_attempts WHERE account = $1', ['register:' + email]);

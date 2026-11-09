@@ -2,12 +2,16 @@
 
 import { useState, type FormEvent } from 'react';
 import Link from 'next/link';
-import { ArrowRight, ArrowUpRight, Check, ChevronRight, Download, FileText, Inbox, LayoutDashboard, LogOut, Menu, Plus, RefreshCw, Search, Settings2, Users, Workflow, X } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Check, ChevronRight, Download, FileText, Inbox, LayoutDashboard, LogOut, Menu, Plus, RefreshCw, Search, Users, Workflow, X } from 'lucide-react';
 import type { Session } from './auth-screen';
 import { AppDialog } from './app-dialog';
 import { CustomerRecord } from './customer-record';
+import { EnquiryForm } from './enquiry-form';
+import { WorkspaceSettings } from './workspace-settings';
+import { ThemeToggle } from './theme-provider';
+import { formatQuantity, getIndustry } from '@/lib/industries';
 import { useServerWorkspace } from '@/hooks/use-server-workspace';
-import { addLead, exportCsv, money, services, setRule, total, transition, type LeadInput, type State, type Status } from '@/lib/automation';
+import { addLead, exportCsv, money, total, transition, type LeadInput, type Status } from '@/lib/automation';
 
 type View = 'overview' | 'enquiries' | 'automations' | 'team';
 const navigation = [
@@ -17,7 +21,6 @@ const navigation = [
   { id: 'team', label: 'Your team', icon: Users },
 ] as const;
 const labels: Record<Status, string> = { Draft: 'Quote draft', Quoted: 'Awaiting reply', Accepted: 'Accepted', Invoiced: 'Invoice ready', Paid: 'Paid', Closed: 'Closed' };
-const newLead: LeadInput = { name: '', email: '', service: 'Deep clean', units: 1, notes: '', source: 'Website form' };
 
 function downloadFile(body: string, name: string, type: string) {
   const url = URL.createObjectURL(new Blob([body], { type }));
@@ -34,8 +37,6 @@ export function BusinessWorkspace({ session, onSignedOut, onSessionChanged }: { 
   const [status, setStatus] = useState('All');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState(newLead);
-  const [formError, setFormError] = useState('');
   const [notice, setNotice] = useState('');
   const [signingOut, setSigningOut] = useState(false);
   const [switching, setSwitching] = useState(false);
@@ -46,16 +47,17 @@ export function BusinessWorkspace({ session, onSignedOut, onSessionChanged }: { 
   const filtered = state.leads.filter(lead => (status === 'All' || status === lead.status) && `${lead.name} ${lead.email} ${lead.service}`.toLowerCase().includes(query.trim().toLowerCase()));
 
   function navigate(next: View) { setView(next); setMenuOpen(false); setNotice(''); }
-  async function capture(event: FormEvent) {
-    event.preventDefault(); setFormError('');
+  async function capture(input: LeadInput) {
+    clearError();
     let createdId: string | undefined;
     const ok = await mutate(current => {
-      const result = addLead(current, form);
+      const result = addLead(current, input);
       if (result.error) throw new Error(result.error);
       createdId = result.id;
       return result.state;
     });
-    if (ok) { setCreating(false); setForm(newLead); setSelectedId(createdId ?? null); setNotice('Enquiry saved. Your quote is ready to review.'); }
+    if (ok) { setCreating(false); setSelectedId(createdId ?? null); setNotice('Enquiry saved. Your quote is ready to review.'); }
+    return ok;
   }
   async function signOut() {
     setSigningOut(true);
@@ -78,19 +80,19 @@ export function BusinessWorkspace({ session, onSignedOut, onSessionChanged }: { 
   }
   const createButton = <button className="btn primary" onClick={() => { clearError(); setCreating(true); }}><Plus size={17}/>New enquiry</button>;
   const table = (items = filtered) => <div className="table-scroll"><table className="lead-table live-table"><caption className="sr-only">Customer enquiries and their next step</caption><thead><tr><th>Customer</th><th>Service</th><th>Status</th><th className="right">Total CAD</th><th><span className="sr-only">Open record</span></th></tr></thead><tbody>
-    {items.map(lead => <tr key={lead.id}><td><button className="customer" onClick={() => setSelectedId(lead.id)}><span className="live-avatar">{lead.name.slice(0, 1).toUpperCase()}</span><span><strong>{lead.name}</strong><small>{lead.email}</small></span></button></td><td>{lead.service}<small>{lead.units} {lead.service === 'Office clean' ? 'hours' : 'bedrooms'}</small></td><td><span className={`badge badge-${lead.status.toLowerCase()}`}>{labels[lead.status]}</span></td><td className="right">{money(total(lead))}</td><td><button className="icon-button" aria-label={`Open ${lead.name}`} onClick={() => setSelectedId(lead.id)}><ArrowUpRight size={18}/></button></td></tr>)}
+    {items.map(lead => <tr key={lead.id}><td><button className="customer" onClick={() => setSelectedId(lead.id)}><span className="live-avatar">{lead.name.slice(0, 1).toUpperCase()}</span><span><strong>{lead.name}</strong><small>{lead.email}</small></span></button></td><td>{lead.service}<small>{formatQuantity(lead)}</small></td><td><span className={`badge badge-${lead.status.toLowerCase()}`}>{labels[lead.status]}</span></td><td className="right">{money(total(lead))}</td><td><button className="icon-button" aria-label={`Open ${lead.name}`} onClick={() => setSelectedId(lead.id)}><ArrowUpRight size={18}/></button></td></tr>)}
   </tbody></table>{!items.length && <div className="live-empty"><Inbox size={30}/><h3>{state.leads.length ? 'No matching enquiries' : 'Your next customer starts here.'}</h3><p>{state.leads.length ? 'Try another name, service, or status.' : 'Add an enquiry to prepare a quote and keep every next step together.'}</p>{state.leads.length ? <button className="btn secondary" onClick={() => { setQuery(''); setStatus('All'); }}>Clear filters</button> : createButton}</div>}</div>;
 
   return <div className="app-shell live-app"><a className="skip-link" href="#workspace-content">Skip to content</a>
     {menuOpen && <button className="mobile-scrim" onClick={() => setMenuOpen(false)} aria-label="Close navigation"/>}
     <aside className={`sidebar ${menuOpen ? 'mobile-open' : ''}`}>
       <Link className="app-wordmark" href="/">donekite<span>.</span></Link>
-      <div className="workspace"><span className="workspace-icon"><Workflow size={20}/></span><div><strong>{session.workspace.name}</strong><small>Shared business workspace</small></div></div>
+      <div className="workspace"><span className="workspace-icon"><Workflow size={20}/></span><div><strong>{session.workspace.name}</strong><small>{getIndustry(state.settings.industry).label}</small></div></div>
       {(session.workspaces?.length ?? 0) > 1 && <select className="workspace-switch" aria-label="Switch workspace" value={session.workspace.id} disabled={saving || switching} onChange={event => switchWorkspace(event.target.value)}>{session.workspaces!.map(workspace => <option key={workspace.id} value={workspace.id}>{workspace.name}</option>)}</select>}
       <p className="nav-label">WORKSPACE</p><nav aria-label="Main navigation">{navigation.map(({ id, label, icon: Icon }) => <button key={id} className={`nav-item ${view === id ? 'active' : ''}`} aria-current={view === id ? 'page' : undefined} onClick={() => navigate(id)}><Icon size={19}/>{label}{id === 'enquiries' && <span className="nav-count">{open.length}</span>}</button>)}</nav>
       <div className="sidebar-bottom"><div className="workspace-help"><span>GETTING STARTED</span><p>A clear path from enquiry to payment.</p><a href="/demo" target="_blank" rel="noreferrer">Explore the guided demo <ArrowUpRight size={14}/></a></div><div className="live-profile"><span className="live-avatar">{session.user.name.slice(0, 1)}</span><div><strong>{session.user.name}</strong><small>{session.workspace.role === 'owner' ? 'Workspace owner' : 'Team member'}</small></div><button className="icon-button" disabled={signingOut || saving} onClick={signOut} aria-label="Sign out"><LogOut size={17}/></button></div></div>
     </aside>
-    <div className="main-shell"><header className="topbar"><div className="breadcrumb"><button className="mobile-menu icon-button" onClick={() => setMenuOpen(!menuOpen)} aria-label="Toggle navigation" aria-expanded={menuOpen}><Menu size={21}/></button><span>{session.workspace.name}</span><ChevronRight size={14}/><strong>{navigation.find(item => item.id === view)?.label}</strong></div><div className="top-actions"><span className={`save-status ${!connected ? 'offline' : ''}`} role="status"><span/>{saving ? 'Saving…' : connected ? 'Connected' : 'Connection interrupted'}</span><button className="icon-button" onClick={refresh} disabled={saving} aria-label="Refresh workspace"><RefreshCw size={17}/></button></div></header>
+    <div className="main-shell"><header className="topbar"><div className="breadcrumb"><button className="mobile-menu icon-button" onClick={() => setMenuOpen(!menuOpen)} aria-label="Toggle navigation" aria-expanded={menuOpen}><Menu size={21}/></button><span>{session.workspace.name}</span><ChevronRight size={14}/><strong>{navigation.find(item => item.id === view)?.label}</strong></div><div className="top-actions"><ThemeToggle/><span className={`save-status ${!connected ? 'offline' : ''}`} role="status"><span/>{saving ? 'Saving…' : connected ? 'Connected' : 'Connection interrupted'}</span><button className="icon-button" onClick={refresh} disabled={saving} aria-label="Refresh workspace"><RefreshCw size={17}/></button></div></header>
       <main id="workspace-content" tabIndex={-1}>
         <div className="page-heading"><div><p className="eyebrow">{new Intl.DateTimeFormat('en-CA', { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date())}</p><h1>{view === 'overview' ? 'A little less busywork.' : view === 'enquiries' ? 'Every enquiry, in one place.' : view === 'automations' ? 'Set your work in motion.' : 'Better, together.'}</h1><p className="page-description">{view === 'overview' ? 'A clear view of your customers and what comes next.' : view === 'enquiries' ? 'From the first hello to a paid invoice. Keep the details together.' : view === 'automations' ? 'Set your rates and choose which drafts DoneKite prepares.' : 'Invite the people who help you keep things moving.'}</p></div>{view !== 'team' && createButton}</div>
         {error && <div className="app-alert" role="alert">{error}<button className="icon-button" aria-label="Dismiss error" onClick={clearError}><X size={17}/></button></div>}
@@ -102,30 +104,14 @@ export function BusinessWorkspace({ session, onSignedOut, onSessionChanged }: { 
           <div className="dashboard-grid"><section className="panel"><div className="panel-heading"><div><h2>Recent enquiries</h2><p>Small details. Clear next steps.</p></div><button className="link-button" onClick={() => navigate('enquiries')}>View all<ArrowUpRight size={15}/></button></div>{table(state.leads.slice(0, 5))}</section><section className="panel"><div className="panel-heading"><div><h2>Latest activity</h2><p>A shared record of your team’s work.</p></div></div><div className="live-activity">{state.activity.slice(0, 6).map(item => <div key={item.id}><span className="activity-icon"><Workflow size={16}/></span><div>{item.leadId ? <button onClick={() => setSelectedId(item.leadId!)}>{item.title}</button> : <strong>{item.title}</strong>}<p>{item.detail}</p><small>{new Date(item.at).toLocaleString('en-CA', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</small></div></div>)}{!state.activity.length && <div className="quiet-empty">Your first enquiry starts the story. Activity will appear here as your team works.</div>}</div></section></div>
         </>}
         {view === 'enquiries' && <section className="panel"><div className="table-toolbar"><div className="search-field"><Search size={18}/><input aria-label="Search enquiries" placeholder="Search customers or services…" value={query} onChange={event => setQuery(event.target.value)}/></div><select className="live-select" aria-label="Filter by status" value={status} onChange={event => setStatus(event.target.value)}><option>All</option>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><button className="btn secondary" onClick={() => downloadFile(exportCsv(filtered), 'donekite-enquiries.csv', 'text/csv;charset=utf-8;')}><Download size={16}/>Export CSV</button></div>{table()}<div className="panel-footer">{filtered.length} of {state.leads.length} enquiries<span>Amounts include tax · CAD</span></div></section>}
-        {view === 'automations' && <PricingAndRules state={state} saving={saving} mutate={mutate}/>}
+        {view === 'automations' && <WorkspaceSettings state={state} saving={saving} mutate={mutate} error={error}/>}
         {view === 'team' && <Team session={session}/>}
         <footer className="live-footer"><span>donekite · Less admin, more business.</span><span>Shared records · Your team stays in control</span></footer>
       </main>
     </div>
-    <AppDialog open={creating} onClose={() => !saving && setCreating(false)} title="New enquiry"><form className="enquiry-form live-form" onSubmit={capture}><p className="modal-intro">Capture the details. We’ll calculate a quote using your service rates.</p><fieldset disabled={saving}><div className="form-row"><label>Customer name<input autoComplete="name" required maxLength={100} value={form.name} onChange={event => setForm({ ...form, name: event.target.value })}/></label><label>Email address<input autoComplete="email" type="email" required maxLength={150} value={form.email} onChange={event => setForm({ ...form, email: event.target.value })}/></label></div><div className="form-row"><label>Service<select value={form.service} onChange={event => setForm({ ...form, service: event.target.value as LeadInput['service'] })}>{services.map(service => <option key={service}>{service}</option>)}</select></label><label>{form.service === 'Office clean' ? 'Estimated hours' : 'Bedrooms'}<input type="number" required min={1} max={20} step={1} value={form.units || ''} onChange={event => setForm({ ...form, units: Number(event.target.value) })}/></label></div><label>Source<select value={form.source} onChange={event => setForm({ ...form, source: event.target.value })}>{['Website form', 'Email', 'Phone', 'Referral', 'Other'].map(source => <option key={source}>{source}</option>)}</select></label><label>Job notes <span className="optional">(optional)</span><textarea rows={3} maxLength={2000} value={form.notes} onChange={event => setForm({ ...form, notes: event.target.value })}/></label><div className="form-estimate"><span>Quote total<small>{state.settings.taxPercent}% tax included</small></span><strong>{money(Math.round(state.settings.rates[form.service] * form.units * 100) / 100 + Math.round(state.settings.rates[form.service] * form.units * state.settings.taxPercent) / 100)}</strong></div>{(formError || error) && <p className="form-error" role="alert">{formError || error}</p>}<div className="modal-actions"><button type="button" className="btn secondary" onClick={() => setCreating(false)}>Cancel</button><button className="btn primary" type="submit">{saving ? 'Saving…' : 'Save enquiry'}<ArrowRight size={16}/></button></div></fieldset></form></AppDialog>
+    <AppDialog open={creating} onClose={() => !saving && setCreating(false)} title="New enquiry">{creating && <EnquiryForm state={state} saving={saving} error={error} onSubmit={capture} onCancel={() => setCreating(false)}/>}</AppDialog>
     <CustomerRecord lead={selected} businessName={session.workspace.name} activity={state.activity.filter(item => item.leadId === selectedId)} saving={saving} error={error} onClose={() => setSelectedId(null)} onAction={async action => { const ok = await mutate(current => transition(current, selectedId!, action)); if (ok) setNotice('Customer record updated.'); return ok; }}/>
   </div>;
-}
-
-function PricingAndRules({ state, saving, mutate }: { state: State; saving: boolean; mutate: (change: (state: State) => State) => Promise<boolean> }) {
-  const [settings, setSettings] = useState(state.settings);
-  const [baseSettings, setBaseSettings] = useState(state.settings);
-  const [message, setMessage] = useState('');
-  const changedElsewhere = JSON.stringify(baseSettings) !== JSON.stringify(state.settings);
-  async function save(event: FormEvent) {
-    event.preventDefault(); setMessage('');
-    if (await mutate(current => {
-      if (JSON.stringify(current.settings) !== JSON.stringify(baseSettings)) throw new Error('Pricing changed while you were editing. Load the latest pricing before saving.');
-      return { ...current, settings };
-    })) { setBaseSettings(settings); setMessage('Pricing saved. Existing quotes keep their agreed amounts.'); }
-  }
-  if (changedElsewhere) return <section className="panel team-panel"><h2>Pricing has been updated.</h2><p>A teammate changed these settings while this screen was open. Load the latest pricing to continue. This replaces any unsaved pricing draft.</p><button className="btn secondary" onClick={() => { setSettings(state.settings); setBaseSettings(state.settings); setMessage(''); }}>Load latest pricing<RefreshCw size={16}/></button></section>;
-  return <><section className="live-rule-list">{([{ key: 'draftQuote', title: 'Prepare quotes', description: 'Calculate a quote from your rates when an enquiry arrives.' }, { key: 'followup', title: 'Prepare a follow-up', description: `Create one draft after ${state.settings.followupHours} hours without a reply.` }, { key: 'invoice', title: 'Prepare invoices', description: 'Create an invoice when your team records customer acceptance.' }] as const).map(rule => <article className="panel live-rule" key={rule.key}><span className="rule-icon"><Workflow size={23}/></span><div><h2>{rule.title}</h2><p>{rule.description}</p></div><button disabled={saving} className={`switch ${state.rules[rule.key] ? 'on' : ''}`} role="switch" aria-checked={state.rules[rule.key]} aria-label={rule.title} onClick={() => mutate(current => setRule(current, rule.key, !current.rules[rule.key]))}><i/></button></article>)}</section><section className="panel"><div className="panel-heading"><div><h2>Service pricing</h2><p>Rates in CAD. Changes apply to new enquiries.</p></div><Settings2 size={20}/></div><form className="live-pricing" onSubmit={save}><fieldset disabled={saving}><div className="pricing-grid">{services.map(service => <label key={service}>{service}<span className="price-input"><span>$</span><input type="number" required min={0.01} max={10000} step={0.01} value={settings.rates[service] || ''} onChange={event => setSettings({ ...settings, rates: { ...settings.rates, [service]: Number(event.target.value) } })}/></span><small>per {service === 'Office clean' ? 'hour' : 'bedroom'}</small></label>)}</div><div className="live-settings-row"><label>Tax (%)<input type="number" required min={0} max={100} step={0.01} value={settings.taxPercent} onChange={event => setSettings({ ...settings, taxPercent: Number(event.target.value) })}/></label><label>Follow-up delay (hours)<input type="number" required min={1} max={720} step={1} value={settings.followupHours} onChange={event => setSettings({ ...settings, followupHours: Number(event.target.value) })}/></label><button className="btn primary" type="submit">{saving ? 'Saving…' : 'Save pricing'}</button></div>{message && <p className="settings-success" role="status">{message}</p>}</fieldset></form></section><div className="live-info"><Workflow size={19}/><p>Rules prepare drafts for your review. Follow-ups are checked when your workspace loads or refreshes. Email delivery and payment collection are handled outside DoneKite.</p></div></>;
 }
 
 function Team({ session }: { session: Session }) {

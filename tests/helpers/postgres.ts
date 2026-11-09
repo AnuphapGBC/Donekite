@@ -1,11 +1,14 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
 import type { Database, SqlClient } from '../../lib/server/database.ts';
 
 // Run the production SQL against PostgreSQL itself, isolated from DATABASE_URL.
 export async function createTestDatabase(dataDir?: string): Promise<Database & { migrate(): Promise<void> }> {
   const engine = await PGlite.create(dataDir);
-  const migration = await readFile(new URL('../../db/migrations/0001_initial.sql', import.meta.url), 'utf8');
+  const directory = new URL('../../db/migrations/', import.meta.url);
+  const migrations = await Promise.all((await readdir(directory))
+    .filter(name => /^\d+_[a-z0-9_]+\.sql$/.test(name)).sort()
+    .map(name => readFile(new URL(name, directory), 'utf8')));
   const adapt = (client: Pick<PGlite, 'query'>): SqlClient => ({
     async query<T = Record<string, unknown>>(text: string, values?: unknown[]) {
       const result = await client.query<T>(text, values);
@@ -18,7 +21,7 @@ export async function createTestDatabase(dataDir?: string): Promise<Database & {
       return engine.transaction(transaction => work(adapt(transaction)));
     },
     close: () => engine.close(),
-    async migrate() { await engine.exec(migration); },
+    async migrate() { for (const migration of migrations) await engine.exec(migration); },
   };
   await database.migrate();
   return database;
